@@ -1,0 +1,81 @@
+version: '3.1'
+
+services:
+  # Memcached Service
+  memcached:
+    image: 'memcached:alpine'
+
+  # Redis Service
+  redis:
+    image: 'redis:alpine'
+
+  # MySQL Service
+  mysql:
+    image: 'mysql:8.0'
+    container_name: mysql-db
+    working_dir: /L5_Networks
+    volumes:
+      - '.:/L5_Networks'
+      - './docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d'  # Diretório para rodar scripts de inicialização
+    environment:
+      - MYSQL_ROOT_PASSWORD=X6Ub1gD325iT
+      - MYSQL_DATABASE=sw_movies
+      - MYSQL_USER=user.app
+      - MYSQL_PASSWORD=vGbeAuu465Xd
+    ports:
+      - '3502:3306'
+    networks:
+      - my-network
+
+  # Webserver (Apache) Service
+  webserver:
+    build:
+      context: ./phpdocker/apache/
+      dockerfile: Dockerfile  
+    container_name: apache-webserver
+    working_dir: /L5_Networks
+    volumes:
+      - '.:/L5_Networks'
+      - './phpdocker/apache/000-default.conf:/etc/apache2/sites-available/000-default.conf'
+      - './phpdocker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/99-overrides.ini'
+    ports:
+      - '3500:80'
+    depends_on:
+      - mysql  # Espera o MySQL estar pronto antes de iniciar
+    networks:
+      - my-network
+
+  # PHP-FPM Service
+  php-fpm:
+    build:
+      context: ./phpdocker/php-fpm  
+    container_name: php-fpm-container
+    working_dir: /L5_Networks
+    volumes:
+      - '.:/L5_Networks'
+      - './phpdocker/php-fpm/php-ini-overrides.ini:/etc/php/7.4/fpm/conf.d/99-overrides.ini'
+      - './phpdocker/php-fpm/php-ini-overrides.ini:/etc/php/7.4/cli/conf.d/99-overrides.ini'
+    depends_on:
+      - mysql  
+    networks:
+      - my-network
+
+  # Documentation Service
+  documentation:
+    build:
+      context: .
+      dockerfile: ./documentation/Dockerfile
+    container_name: documentation
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mysql  
+    networks:
+      - my-network
+
+networks:
+  my-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
